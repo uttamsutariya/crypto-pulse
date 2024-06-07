@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/uttamsutariya/crypto-pulse/internal/app"
 	"github.com/uttamsutariya/crypto-pulse/internal/config"
 )
 
@@ -14,7 +15,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	log.Println("Kafka Broker ::", cfg.KafkaBrokers)
-	log.Println("Kafka Topic ::", cfg.KafkaTopic)
-	log.Println("WebSocketURLs ::", cfg.WebSocketURLs)
+	log.Println("Starting crypto pulse!")
+
+	application := app.NewApp(cfg)
+	application.Start()
 }
