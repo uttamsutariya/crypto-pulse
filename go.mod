@@ -4,6 +4,7 @@ go 1.21.3
 
 require (
 	github.com/IBM/sarama v1.43.2
+	github.com/gorilla/websocket v1.5.1
 	github.com/joho/godotenv v1.5.1
 )
 

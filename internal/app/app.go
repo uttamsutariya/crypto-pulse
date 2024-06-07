@@ -10,28 +10,24 @@ import (
 
 	"github.com/uttamsutariya/crypto-pulse/internal/config"
 	"github.com/uttamsutariya/crypto-pulse/internal/kafka"
+	"github.com/uttamsutariya/crypto-pulse/internal/websocket"
 )
 
 type App struct {
-	config   *config.Config
-	producer *kafka.Producer
-	wg       sync.WaitGroup
-	closeCh  chan struct{}
+	producer  *kafka.Producer
+	wg        sync.WaitGroup
+	closeCh   chan struct{}
+	wsClients []*websocket.WebSocketClient
 }
 
 func NewApp(cfg *config.Config) *App {
-	return &App{
-		config:  cfg,
-		closeCh: make(chan struct{}),
-	}
-}
-
-func (app *App) Start() {
-	consecutiveFails := 0
 	var err error
+	var producer *kafka.Producer
+	config := config.GetConfig()
+	consecutiveFails := 0
 
-	for consecutiveFails <= app.config.KafkaConnectionFailThreshold {
-		app.producer, err = kafka.NewProducer(app.config.KafkaBrokers, app.config.KafkaTopic)
+	for consecutiveFails <= config.KafkaConnectionFailThreshold {
+		producer, err = kafka.NewProducer(config.KafkaBrokers, config.KafkaTopic)
 		if err != nil {
 			log.Fatalf("Failed to create Kafka producer: %v", err)
 			consecutiveFails++
@@ -43,14 +39,34 @@ func (app *App) Start() {
 		}
 	}
 
-	if consecutiveFails >= app.config.KafkaConnectionFailThreshold {
+	if consecutiveFails >= config.KafkaConnectionFailThreshold {
 		log.Fatalf("All retries exhusted to run kafka producer: %v", err)
 		log.Fatal("Shutting down service...")
 		os.Exit(1)
 	}
 
-	defer app.producer.Close()
+	return &App{
+		closeCh:  make(chan struct{}),
+		producer: producer,
+	}
+}
 
+func (app *App) Start() {
+	defer app.producer.Close()
+	config := config.GetConfig()
+
+	for _, url := range config.WebSocketURLs {
+		wsClient := websocket.NewWebSocketClient(url, &app.wg, app.closeCh)
+		app.wsClients = append(app.wsClients, wsClient)
+		wsClient.Connect()
+		go wsClient.Reconnect()
+	}
+
+	app.handleInterrupt()
+	app.wg.Wait()
+}
+
+func (app *App) handleInterrupt() {
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
 
@@ -69,6 +85,4 @@ func (app *App) Start() {
 		log.Println("Shutdown complete!")
 		os.Exit(0)
 	}()
-
-	app.wg.Wait()
 }
