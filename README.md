@@ -27,10 +27,20 @@ It starts the kafka & zookeeper locally and expose kafka on port `9092`
 docker compose up -d
 ```
 
-## 3. Run
+## 3. Run Crypto Pulse
 Compile the source code & start the application
 ```bash
-go build -o main .
-
-./main
+go build -o main . && ./main
 ```
+
+## 3. Run Kafka Console Consumer
+To see if the messages are being consumed by consumer perfectly, run kafka console consumer.
+```
+docker ps
+
+docker exec -it << container_name OR container_id >> /bin/bash
+
+kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic crypto_data
+```
+
+![alt text](screenshots/image.png)
