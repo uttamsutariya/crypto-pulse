@@ -1,9 +1,11 @@
 package kafka
 
 import (
+	"encoding/json"
 	"log"
 
 	"github.com/IBM/sarama"
+	"github.com/uttamsutariya/crypto-pulse/internal/types"
 )
 
 type Producer struct {
@@ -35,6 +37,31 @@ func NewProducer(brokers []string, topic string) (*Producer, error) {
 		producer: producer,
 		topic:    topic,
 	}, nil
+}
+
+func (p *Producer) SendMessage(batchMessage []types.KafkaMessage) error {
+	kafkaBatchMessages := make([]*sarama.ProducerMessage, 0)
+
+	for _, msg := range batchMessage {
+		messageBytes, err := json.Marshal(msg)
+		if err != nil {
+			log.Printf("Error marshalling kafka message :: %v", err)
+		}
+
+		kafkaMsg := &sarama.ProducerMessage{
+			Topic: p.topic,
+			Value: sarama.ByteEncoder(messageBytes),
+		}
+
+		kafkaBatchMessages = append(kafkaBatchMessages, kafkaMsg)
+	}
+
+	err := producer.SendMessages(kafkaBatchMessages)
+	if err != nil {
+		log.Printf("Error sending kafka messages :: %v", err)
+	}
+
+	return err
 }
 
 func (p *Producer) Close() {

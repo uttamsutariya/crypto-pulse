@@ -1,6 +1,7 @@
 package app
 
 import (
+	"encoding/json"
 	"log"
 	"os"
 	"os/signal"
@@ -11,6 +12,7 @@ import (
 	"github.com/uttamsutariya/crypto-pulse/internal/config"
 	"github.com/uttamsutariya/crypto-pulse/internal/kafka"
 	"github.com/uttamsutariya/crypto-pulse/internal/websocket"
+	"github.com/uttamsutariya/crypto-pulse/pkg/utils"
 )
 
 type App struct {
@@ -54,12 +56,35 @@ func NewApp(cfg *config.Config) *App {
 func (app *App) Start() {
 	defer app.producer.Close()
 	config := config.GetConfig()
+	spotUrl := config.WebSocketURLs[0]
 
 	for _, url := range config.WebSocketURLs {
 		wsClient := websocket.NewWebSocketClient(url, &app.wg, app.closeCh)
 		app.wsClients = append(app.wsClients, wsClient)
 		wsClient.Connect()
 		go wsClient.Reconnect()
+
+		app.wg.Add(1)
+		go func(client *websocket.WebSocketClient, url string) {
+			defer app.wg.Done()
+			for batch := range client.Messages() {
+				select {
+				case <-app.closeCh:
+					return
+				default:
+					var jsonBatch []map[string]interface{}
+					if err := json.Unmarshal([]byte(batch), &jsonBatch); err != nil {
+						log.Printf("Failed to unmarshal batch :: %v", err)
+					}
+
+					isSpotSymbol := spotUrl == url
+					kafkaBatchMessages := utils.FormatExchangeMessageToKafka(jsonBatch, isSpotSymbol)
+					if err := app.producer.SendMessage(kafkaBatchMessages); err != nil {
+						log.Printf("Failed to send message to Kafka: %v", err)
+					}
+				}
+			}
+		}(wsClient, url)
 	}
 
 	app.handleInterrupt()
