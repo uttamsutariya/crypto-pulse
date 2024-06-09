@@ -21,24 +21,21 @@ MESSAGE_FAIL_THRESHOLD=10
 KAFKA_CONNECTION_FAIL_THRESHOLD = 5
 ```
 
-## 4. Start kafka locally using Docker
-It starts the kafka & zookeeper locally and expose kafka on port `9092`
+## 3. Start service locally using docker compose
+It starts the kafka, zookeeper & crypto-pulse service locally and expose kafka on port `9092`
+<br>
+<br>
+`NOTE : No need to expose the crypto-pulse service on any port as we only want the data being streamed to the kafka to be consumed by the consumer`
 ```bash
 docker compose up -d
 ```
 
-## 3. Run Crypto Pulse
-Compile the source code & start the application
-```bash
-go build -o main . && ./main
-```
-
-## 3. Run Kafka Console Consumer
+## 4 . Run Kafka Console Consumer
 To see if the messages are being consumed by consumer perfectly, run kafka console consumer.
 ```
 docker ps
 
-docker exec -it << container_name OR container_id >> /bin/bash
+docker exec -it kafka /bin/bash
 
 kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic crypto_data
 ```
